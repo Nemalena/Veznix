@@ -1,0 +1,44 @@
+{
+  "name": "api",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "npm run db:generate && tsc",
+    "start": "node dist/index.js",
+    "db:push": "prisma db push --schema=src/prisma/schema.prisma",
+    "db:studio": "prisma studio",
+    "db:seed": "tsx src/scripts/seed_mock_data.ts",
+    "db:format": "prisma format --schema=src/prisma/schema.prisma",
+    "db:generate": "prisma generate --schema=src/prisma/schema.prisma"
+  },
+  "dependencies": {
+    "@azure/msal-node": "^5.0.6",
+    "@fastify/cors": "^8.5.0",
+    "@fastify/rate-limit": "^9.1.0",
+    "@microsoft/microsoft-graph-client": "^3.0.7",
+    "@microsoft/microsoft-graph-types": "^2.43.1",
+    "@prisma/adapter-pg": "^7.5.0",
+    "@prisma/client": "^7.5.0",
+    "@sentry/node": "^10.43.0",
+    "bullmq": "^5.70.4",
+    "fastify": "^4.26.0",
+    "ioredis": "^5.10.0",
+    "isomorphic-fetch": "^3.0.0",
+    "jose": "^6.2.1",
+    "pg": "^8.20.0",
+    "sanitize-html": "^2.12.1"
+  },
+  "devDependencies": {
+    "@types/microsoft-graph": "^2.40.1",
+    "@types/node": "^22.19.15",
+    "@types/pg": "^8.11.11",
+    "@types/sanitize-html": "^2.11.0",
+    "dotenv": "^16.6.1",
+    "prisma": "^7.5.0",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.7.1",
+    "typescript": "^5.9.3",
+    "vitest": "^1.3.1"
+  }
+}

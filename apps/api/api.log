@@ -1,0 +1,24 @@
+nohup: ignoring input
+
+> api@1.0.0 start
+> node dist/index.js
+
+[webhook-renewal] Worker started. Renewal runs every 24h.
+[overdue-check] Worker started. Runs every hour.
+{"level":30,"time":1774625915010,"pid":25380,"hostname":"ubuntu-8gb-nbg1-2","msg":"Server listening at http://0.0.0.0:3000"}
+{"level":30,"time":1774625915010,"pid":25380,"hostname":"ubuntu-8gb-nbg1-2","msg":"API server started on port 3000"}
+{"level":30,"time":1774625936038,"pid":25380,"hostname":"ubuntu-8gb-nbg1-2","reqId":"req-1","req":{"method":"GET","url":"/","hostname":"178.104.120.163","remoteAddress":"152.32.212.149","remotePort":55140},"msg":"incoming request"}
+{"level":30,"time":1774625936039,"pid":25380,"hostname":"ubuntu-8gb-nbg1-2","reqId":"req-1","msg":"Route GET:/ not found"}
+{"level":30,"time":1774625936043,"pid":25380,"hostname":"ubuntu-8gb-nbg1-2","reqId":"req-1","res":{"statusCode":404},"responseTime":3.9443640001118183,"msg":"request completed"}
+{"level":30,"time":1774625957951,"pid":25380,"hostname":"ubuntu-8gb-nbg1-2","reqId":"req-2","req":{"method":"GET","url":"/","hostname":"178.104.120.163:3000","remoteAddress":"45.194.70.251","remotePort":55608},"msg":"incoming request"}
+{"level":30,"time":1774625957951,"pid":25380,"hostname":"ubuntu-8gb-nbg1-2","reqId":"req-2","msg":"Route GET:/ not found"}
+{"level":30,"time":1774625957951,"pid":25380,"hostname":"ubuntu-8gb-nbg1-2","reqId":"req-2","res":{"statusCode":404},"responseTime":0.603982999920845,"msg":"request completed"}
+{"level":30,"time":1774625958348,"pid":25380,"hostname":"ubuntu-8gb-nbg1-2","reqId":"req-3","req":{"method":"GET","url":"/favicon.ico","hostname":"178.104.120.163:3000","remoteAddress":"45.194.70.251","remotePort":55740},"msg":"incoming request"}
+{"level":30,"time":1774625958348,"pid":25380,"hostname":"ubuntu-8gb-nbg1-2","reqId":"req-3","msg":"Route GET:/favicon.ico not found"}
+{"level":30,"time":1774625958348,"pid":25380,"hostname":"ubuntu-8gb-nbg1-2","reqId":"req-3","res":{"statusCode":404},"responseTime":0.45688800141215324,"msg":"request completed"}
+{"level":30,"time":1774625958743,"pid":25380,"hostname":"ubuntu-8gb-nbg1-2","reqId":"req-4","req":{"method":"GET","url":"/sitemap.xml","hostname":"178.104.120.163:3000","remoteAddress":"45.194.70.251","remotePort":55846},"msg":"incoming request"}
+{"level":30,"time":1774625958743,"pid":25380,"hostname":"ubuntu-8gb-nbg1-2","reqId":"req-4","msg":"Route GET:/sitemap.xml not found"}
+{"level":30,"time":1774625958743,"pid":25380,"hostname":"ubuntu-8gb-nbg1-2","reqId":"req-4","res":{"statusCode":404},"responseTime":0.43104800023138523,"msg":"request completed"}
+{"level":30,"time":1774625958752,"pid":25380,"hostname":"ubuntu-8gb-nbg1-2","reqId":"req-5","req":{"method":"GET","url":"/robots.txt","hostname":"178.104.120.163:3000","remoteAddress":"45.194.70.251","remotePort":55844},"msg":"incoming request"}
+{"level":30,"time":1774625958752,"pid":25380,"hostname":"ubuntu-8gb-nbg1-2","reqId":"req-5","msg":"Route GET:/robots.txt not found"}
+{"level":30,"time":1774625958752,"pid":25380,"hostname":"ubuntu-8gb-nbg1-2","reqId":"req-5","res":{"statusCode":404},"responseTime":0.43731999956071377,"msg":"request completed"}

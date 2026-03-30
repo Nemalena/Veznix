@@ -1,0 +1,384 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Mailbox {
+  id                    String    @id @default(cuid())
+  emailAddress          String    @unique
+  displayName           String
+  graphMailboxId        String?
+  webhookSubscriptionId String?
+  webhookExpiry         DateTime?
+  deltaLink             String? // Store after every poll — losing this means re-fetching everything
+  signature             String? // Sanitized HTML — run through sanitize-html on save, not at render
+  isActive              Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+
+  tickets          Ticket[]
+  access           MailboxAccess[]
+  outboundArticles TicketArticle[]  @relation("SentFromMailbox")
+  assignmentRules  AssignmentRule[]
+  cannedResponses  CannedResponse[]
+  slaRules         SlaRule[]
+
+  @@index([isActive])
+}
+
+model User {
+  id          String   @id @default(cuid())
+  entraId     String   @unique
+  email       String   @unique
+  displayName String
+  avatarUrl                    String?
+  isActive                     Boolean  @default(true)
+  isAdmin                      Boolean  @default(false)
+  emailNotificationsEnabled    Boolean  @default(true)
+  signature                    String?  @db.Text
+  createdAt                    DateTime @default(now())
+
+  assignedTickets  Ticket[]
+  sentArticles     TicketArticle[]
+  groupMemberships GroupMember[]
+  notifications    Notification[]
+  mentionsMade     Mention[]               @relation("MentionerUser")
+  mentionedIn      Mention[]               @relation("MentionedUser")
+  mailboxAccess    MailboxAccess[]
+  ticketEvents     TicketEvent[]
+  sensitiveAccess  TicketSensitiveAccess[]
+  assignmentRules  AssignmentRule[]
+  cannedResponses  CannedResponse[]
+}
+
+model Group {
+  id          String @id @default(cuid())
+  name        String @unique
+  displayName String
+
+  members         GroupMember[]
+  mailboxAccess   MailboxAccess[]
+  mentions        Mention[]
+  assignmentRules AssignmentRule[]
+  tickets         Ticket[]
+}
+
+model GroupMember {
+  groupId String
+  userId  String
+  group   Group  @relation(fields: [groupId], references: [id])
+  user    User   @relation(fields: [userId], references: [id])
+
+  @@id([groupId, userId])
+}
+
+model MailboxAccess {
+  id          String      @id @default(cuid())
+  mailboxId   String
+  granteeType GranteeType
+  userId      String?
+  groupId     String?
+
+  mailbox Mailbox @relation(fields: [mailboxId], references: [id])
+  user    User?   @relation(fields: [userId], references: [id])
+  group   Group?  @relation(fields: [groupId], references: [id])
+
+  @@unique([mailboxId, granteeType, userId])
+  @@unique([mailboxId, granteeType, groupId])
+  @@index([mailboxId])
+  @@index([userId])
+  @@index([groupId])
+}
+
+enum GranteeType {
+  USER
+  GROUP
+}
+
+model Tag {
+  id     String @id @default(cuid())
+  name   String @unique // Validated: lowercase alphanumeric + hyphens, max 50 chars
+  colour String @default("#6366f1")
+
+  tickets TicketTag[]
+}
+
+model TicketTag {
+  ticketId String
+  tagId    String
+  ticket   Ticket @relation(fields: [ticketId], references: [id])
+  tag      Tag    @relation(fields: [tagId], references: [id])
+
+  @@id([ticketId, tagId])
+}
+
+model CannedResponse {
+  id              String   @id @default(cuid())
+  title           String
+  bodyHtml        String
+  mailboxId       String? // null = available for all mailboxes
+  createdByUserId String? // null = legacy record, only admins can delete
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  mailbox   Mailbox? @relation(fields: [mailboxId], references: [id])
+  createdBy User?    @relation(fields: [createdByUserId], references: [id])
+
+  @@index([mailboxId])
+  @@index([createdByUserId])
+}
+
+// Auto-assignment rules — evaluated in priority order on new ticket creation
+// Condition examples: { "subjectContains": "invoice" }, { "senderDomain": "ministry.gov.rs" }
+// ⚠️ ReDoS risk: subjectMatchesRegex conditions must be evaluated in a Worker thread
+//    with a timeout. Only trusted admins can create rules, but validate anyway.
+//    Address this when assignment rules are built in Phase 5.
+model AssignmentRule {
+  id              String   @id @default(cuid())
+  mailboxId       String
+  priority        Int      @default(0)
+  conditions      Json
+  assignToUserId  String?
+  assignToGroupId String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  mailbox       Mailbox @relation(fields: [mailboxId], references: [id])
+  assignToUser  User?   @relation(fields: [assignToUserId], references: [id])
+  assignToGroup Group?  @relation(fields: [assignToGroupId], references: [id])
+
+  @@index([mailboxId, priority])
+}
+
+// SLA rules — auto-set dueAt on ticket creation based on conditions
+// Evaluated in priority order (ascending), first match wins
+model SlaRule {
+  id            String   @id @default(cuid())
+  mailboxId     String
+  priority      Int      @default(0)
+  conditions    Json     // Same condition keys as AssignmentRule
+  responseHours Float    // e.g. 4.0 = 4 hours from ticket creation
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  mailbox Mailbox @relation(fields: [mailboxId], references: [id])
+
+  @@index([mailboxId, priority])
+}
+
+model Ticket {
+  id                String       @id @default(cuid())
+  subject           String
+  externalThreadId  String?
+  inReplyToId       String?
+  originMailboxId   String
+  assignedToUserId  String?
+  assignedToGroupId String?
+  status            TicketStatus @default(NEW)
+  dueAt             DateTime?
+  firstReplyAt      DateTime?
+  resolvedAt        DateTime?
+  isSensitive       Boolean      @default(false)
+  deletedAt         DateTime? // Soft delete for normal tickets
+  mergedIntoId      String?   // Set when this ticket is merged into another
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  originMailbox   Mailbox                 @relation(fields: [originMailboxId], references: [id])
+  assignedTo      User?                   @relation(fields: [assignedToUserId], references: [id])
+  assignedToGroup Group?                  @relation(fields: [assignedToGroupId], references: [id])
+  articles        TicketArticle[]
+  notifications   Notification[]
+  events          TicketEvent[]
+  sensitiveAccess TicketSensitiveAccess[]
+  tags            TicketTag[]
+  mergedInto      Ticket?                 @relation("MergedTickets", fields: [mergedIntoId], references: [id])
+  mergedSources   Ticket[]                @relation("MergedTickets")
+  linksAsSource   TicketLink[]            @relation("SourceLinks")
+  linksAsTarget   TicketLink[]            @relation("TargetLinks")
+
+  @@index([originMailboxId])
+  @@index([status])
+  @@index([assignedToUserId])
+  @@index([createdAt])
+  @@index([dueAt])
+  @@index([isSensitive])
+  @@index([deletedAt])
+  @@index([status, createdAt])
+  @@index([originMailboxId, status])
+  @@index([isSensitive, originMailboxId])
+}
+
+enum TicketStatus {
+  NEW
+  OPEN
+  PENDING
+  RESOLVED
+}
+
+model TicketLink {
+  id             String         @id @default(cuid())
+  sourceTicketId String
+  targetTicketId String
+  linkType       TicketLinkType
+  createdAt      DateTime       @default(now())
+
+  sourceTicket Ticket @relation("SourceLinks", fields: [sourceTicketId], references: [id], onDelete: Cascade)
+  targetTicket Ticket @relation("TargetLinks", fields: [targetTicketId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceTicketId, targetTicketId, linkType])
+  @@index([sourceTicketId])
+  @@index([targetTicketId])
+}
+
+enum TicketLinkType {
+  RELATED
+  DUPLICATE
+  BLOCKS
+}
+
+model TicketSensitiveAccess {
+  id        String   @id @default(cuid())
+  ticketId  String
+  userId    String
+  grantedAt DateTime @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([ticketId, userId])
+  @@index([ticketId])
+  @@index([userId])
+}
+
+model TicketArticle {
+  id                String      @id @default(cuid())
+  ticketId          String
+  type              ArticleType
+  fromAddress       String?
+  toAddress         String?
+  ccAddresses       String?     // Comma-separated CC recipients (stored separately from toAddress)
+  bccAddresses      String?     // Comma-separated BCC recipients (agent-visible only, never sent to recipients)
+  sentFromMailboxId String?
+  sentByUserId      String?
+  bodyHtml          String? // Raw from Graph — sanitized with DOMPurify at render time (frontend only)
+  bodyText          String?
+  graphMessageId    String?     @unique // Dedup key — Graph webhooks may deliver same message twice
+  createdAt         DateTime    @default(now())
+
+  attachments     Attachment[]
+  ticket          Ticket       @relation(fields: [ticketId], references: [id])
+  sentFromMailbox Mailbox?     @relation("SentFromMailbox", fields: [sentFromMailboxId], references: [id])
+  sentBy          User?        @relation(fields: [sentByUserId], references: [id])
+  mentions        Mention[]
+
+  @@index([ticketId])
+  @@index([graphMessageId])
+  @@index([createdAt])
+}
+
+enum ArticleType {
+  EMAIL_INBOUND
+  EMAIL_OUTBOUND
+  INTERNAL_NOTE
+}
+
+model Attachment {
+  id          String   @id @default(cuid())
+  articleId   String
+  filename    String
+  mimeType    String
+  sizeBytes   Int
+  storagePath String // /data/attachments/{articleId}/{filename}
+  createdAt   DateTime @default(now())
+
+  // onDelete: Cascade removes DB rows when article is deleted
+  // BUT disk files must also be cleaned up — see cleanup.service.ts
+  article TicketArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([articleId])
+}
+
+model Mention {
+  id               String      @id @default(cuid())
+  articleId        String
+  mentionerId      String
+  mentionedType    GranteeType
+  mentionedUserId  String?
+  mentionedGroupId String?
+  createdAt        DateTime    @default(now())
+
+  article        TicketArticle @relation(fields: [articleId], references: [id])
+  mentioner      User          @relation("MentionerUser", fields: [mentionerId], references: [id])
+  mentionedUser  User?         @relation("MentionedUser", fields: [mentionedUserId], references: [id])
+  mentionedGroup Group?        @relation(fields: [mentionedGroupId], references: [id])
+
+  @@index([articleId])
+  @@index([mentionedUserId])
+}
+
+model Notification {
+  id              String           @id @default(cuid())
+  recipientUserId String
+  type            NotificationType
+  ticketId        String
+  articleId       String?
+  isRead          Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+
+  recipient User   @relation(fields: [recipientUserId], references: [id])
+  ticket    Ticket @relation(fields: [ticketId], references: [id])
+
+  @@index([recipientUserId, isRead])
+  @@index([createdAt])
+}
+
+enum NotificationType {
+  TICKET_ASSIGNED
+  MENTIONED
+  TICKET_REPLIED
+  NEW_TICKET
+  TICKET_OVERDUE
+}
+
+// actorId is nullable — null means system-generated event (overdue check, auto-assignment)
+model TicketEvent {
+  id        String          @id @default(cuid())
+  ticketId  String
+  actorId   String?
+  type      TicketEventType
+  meta      Json?
+  createdAt DateTime        @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id])
+  actor  User?  @relation(fields: [actorId], references: [id])
+
+  @@index([ticketId, createdAt])
+  @@index([actorId])
+}
+
+enum TicketEventType {
+  CREATED
+  ASSIGNED
+  UNASSIGNED
+  STATUS_CHANGED
+  REPLIED
+  NOTE_ADDED
+  DEADLINE_SET
+  DEADLINE_CLEARED
+  MARKED_SENSITIVE
+  SENSITIVITY_REMOVED
+  TAG_ADDED
+  TAG_REMOVED
+  RULE_AUTO_ASSIGNED
+  MERGED_INTO   // Written on source: "merged into ticket Y"
+  MERGE_SOURCE  // Written on target: "absorbed ticket X"
+  SPLIT_FROM    // Written on source: "article split into new ticket Y"
+  SPLIT_INTO    // Written on new ticket: "created by splitting from ticket X"
+  DELETED
+  OVERDUE_NOTIFIED // System event — prevents duplicate overdue notifications
+}

@@ -1,0 +1,13 @@
+{
+  "name": "tempus-mail-ticketing",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "devDependencies": {
+    "prisma": "^7.5.0"
+  },
+  "dependencies": {
+    "@prisma/client": "^7.5.0"
+  }
+}
