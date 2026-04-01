@@ -4,7 +4,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: tempusmail
-      POSTGRES_PASSWORD: x7Ksq2EsO4fKQ+zYkOEtNg==
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: tempusmail
     ports:
       - "5432:5432"
